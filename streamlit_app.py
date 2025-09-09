@@ -31,6 +31,13 @@ def check_credentials(username, password):
     import hashlib
     import os
     import base64
+    import logging
+    
+    # 配置日志
+    logging.basicConfig(level=logging.INFO, 
+                      format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                      handlers=[logging.FileHandler("auth.log"), logging.StreamHandler()])
+    logger = logging.getLogger("auth")
     
     # 使用环境变量或secrets存储盐值，这里使用固定盐值作为示例
     # 实际应用中应该使用环境变量或其他安全方式存储
@@ -47,19 +54,34 @@ def check_credentials(username, password):
         stored_username = secrets["username"]
         stored_password_hash = secrets.get("password_hash")
         
+        # 记录验证信息
+        hashed_input = hash_password(password, salt)
+        logger.info(f"验证用户: {username}, 存储用户名: {stored_username}")
+        
         # 如果存储的是哈希密码
         if stored_password_hash:
-            return username == stored_username and hash_password(password, salt) == stored_password_hash
+            result = username == stored_username and hashed_input == stored_password_hash
+            logger.info(hashed_input)
+            logger.info(stored_password_hash)
+            logger.info(f"哈希密码验证结果: {result}")
+            return result
         # 如果存储的是明文密码（不推荐）
         else:
-            return username == stored_username and password == secrets["password"]
+            result = username == stored_username and password == secrets["password"]
+            logger.info(f"明文密码验证结果: {result}")
+            return result
     except Exception as e:
         # 回退到默认凭据（仅用于开发环境）
         default_username = "xd"
-        print(hash_password(password, salt) == stored_password_hash)
         default_password_hash = "5c28b8dab232deda9713e631a3d5e2718f5cb082f5e8a688eec4742c3ac56e77"
         
-        return username == default_username and hash_password(password, salt) == default_password_hash
+        # 记录回退到默认凭据的情况
+        logger.warning(f"使用默认凭据验证，异常: {str(e)}")
+        hashed_input = hash_password(password, salt)
+        result = username == default_username and hashed_input == default_password_hash
+        logger.info(f"默认凭据验证结果: {result}")
+        
+        return result
 
 def login_page():
     """显示登录页面"""
