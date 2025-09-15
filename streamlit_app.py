@@ -233,6 +233,13 @@ if selected == "数据录入":
                 value=0,
                 help="本周解决的BUG数量"
             )
+            
+            new_bugs = st.number_input(
+                "新增的BUG数",
+                min_value=0,
+                value=0,
+                help="本周新增的BUG数量"
+            )
         
         with col2:
             st.subheader("🚀 发布相关")
@@ -280,6 +287,7 @@ if selected == "数据录入":
                 'online_requirements': online_requirements,
                 'online_req_count': online_req_count,
                 'fixed_bugs': fixed_bugs,
+                'new_bugs': new_bugs,
                 'bug_fix_rate': 95.0,  # 默认值，保持数据库兼容性
                 'release_orders': release_orders,
                 'release_failures': release_failures,
@@ -289,7 +297,7 @@ if selected == "数据录入":
             
             try:
                 report_id = db.insert_weekly_report(report_data)
-                st.success(f"✅ 周报数据保存成功！记录ID: {report_id}，周期：{monday_date} 至 {sunday_date}，上线需求数：{online_requirements}，需求关联req数：{online_req_count}，解决的BUG数：{fixed_bugs}，发布工单数：{release_orders}，发布失败数：{release_failures}，新增可复用的最小单元数：{new_reuse_units}，新增复用事件数：{new_reuse_events}")
+                st.success(f"✅ 周报数据保存成功！记录ID: {report_id}，周期：{monday_date} 至 {sunday_date}，上线需求数：{online_requirements}，需求关联req数：{online_req_count}，解决的BUG数：{fixed_bugs}，新增BUG数：{new_bugs}，发布工单数：{release_orders}，发布失败数：{release_failures}，新增可复用的最小单元数：{new_reuse_units}，新增复用事件数：{new_reuse_events}")
                 st.balloons()
             except Exception as e:
                 st.error(f"❌ 保存失败: {str(e)}")
@@ -309,8 +317,12 @@ if selected == "数据可视化":
         df['monday_date'] = pd.to_datetime(df['monday_date'])
         df = df.sort_values('monday_date')
         
+        # 确保new_bugs字段存在，如果不存在则添加默认值0
+        if 'new_bugs' not in df.columns:
+            df['new_bugs'] = 0
+        
         # 计算周环比
-        metrics = ['online_requirements', 'online_req_count', 'fixed_bugs', 
+        metrics = ['online_requirements', 'online_req_count', 'fixed_bugs', 'new_bugs',
                   'release_orders', 'release_failures', 
                   'new_reuse_units', 'new_reuse_events']
         
@@ -341,6 +353,7 @@ if selected == "数据可视化":
                     req_change = calculate_week_over_week_change(week_data['online_requirements'], prev_week_data['online_requirements'])
                     req_count_change = calculate_week_over_week_change(week_data['online_req_count'], prev_week_data['online_req_count'])
                     bug_change = calculate_week_over_week_change(week_data['fixed_bugs'], prev_week_data['fixed_bugs'])
+                    new_bug_change = calculate_week_over_week_change(week_data['new_bugs'], prev_week_data['new_bugs'])
                     release_change = calculate_week_over_week_change(week_data['release_orders'], prev_week_data['release_orders'])
                     failure_change = calculate_week_over_week_change(week_data['release_failures'], prev_week_data['release_failures'])
                     unit_change = calculate_week_over_week_change(week_data['new_reuse_units'], prev_week_data['new_reuse_units'])
@@ -351,6 +364,7 @@ if selected == "数据可视化":
                         '上线需求数': format_change_with_color(int(week_data['online_requirements']), req_change),
                         '需求关联req数': format_change_with_color(int(week_data['online_req_count']), req_count_change),
                         '解决的BUG数': format_change_with_color(int(week_data['fixed_bugs']), bug_change),
+                        '新增BUG数': format_change_with_color(int(week_data['new_bugs']), new_bug_change),
                         '发布工单数': format_change_with_color(int(week_data['release_orders']), release_change),
                         '发布失败数': format_change_with_color(int(week_data['release_failures']), failure_change),
                         '新增可复用的最小单元数': format_change_with_color(int(week_data['new_reuse_units']), unit_change),
@@ -363,6 +377,7 @@ if selected == "数据可视化":
                         '上线需求数': f"{int(week_data['online_requirements'])} (-)",
                         '需求关联req数': f"{int(week_data['online_req_count'])} (-)",
                         '解决的BUG数': f"{int(week_data['fixed_bugs'])} (-)",
+                        '新增BUG数': f"{int(week_data['new_bugs'])} (-)",
                         '发布工单数': f"{int(week_data['release_orders'])} (-)",
                         '发布失败数': f"{int(week_data['release_failures'])} (-)",
                         '新增可复用的最小单元数': f"{int(week_data['new_reuse_units'])} (-)",
@@ -424,6 +439,14 @@ if selected == "数据可视化":
                 )
             
             with col3:
+                change = latest_report['new_bugs_change'] if previous_report is not None else 0
+                st.metric(
+                    "新增BUG数",
+                    int(latest_report['new_bugs']),
+                    delta=f"{change:.1f}%" if previous_report is not None else None
+                )
+            
+            with col4:
                 change = latest_report['release_orders_change'] if previous_report is not None else 0
                 st.metric(
                     "发布工单数",
@@ -439,6 +462,7 @@ if selected == "数据可视化":
             "上线需求数": "online_requirements",
             "需求关联req数": "online_req_count",
             "解决的BUG数": "fixed_bugs",
+            "新增BUG数": "new_bugs",
             "发布工单数": "release_orders",
             "发布失败数": "release_failures",
             "新增可复用的最小单元数": "new_reuse_units",
@@ -491,6 +515,10 @@ elif selected == "数据管理":
         # 显示数据表格
         df = pd.DataFrame(reports)
         
+        # 确保new_bugs字段存在，如果不存在则添加默认值
+        if 'new_bugs' not in df.columns:
+            df['new_bugs'] = 0
+        
         # 重新排列和重命名列
         display_columns = {
             'id': 'ID',
@@ -499,6 +527,7 @@ elif selected == "数据管理":
             'online_requirements': '上线需求数',
             'online_req_count': '需求关联req数',
             'fixed_bugs': '解决的BUG数',
+            'new_bugs': '新增BUG数',
             'release_orders': '发布工单数',
             'release_failures': '发布失败数',
             'new_reuse_units': '新增可复用的最小单元数',
@@ -518,7 +547,7 @@ elif selected == "数据管理":
         
         # 数据统计
         st.subheader("📊 数据统计")
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4, col5 = st.columns(5)
         
         with col1:
             st.metric("总记录数", len(df))
@@ -530,8 +559,16 @@ elif selected == "数据管理":
         with col3:
             total_bugs = df['fixed_bugs'].sum()
             st.metric("累计解决BUG", int(total_bugs))
-        
+            
         with col4:
+            # 处理可能不存在的new_bugs字段
+            if 'new_bugs' in df.columns:
+                total_new_bugs = df['new_bugs'].sum()
+                st.metric("累计新增BUG", int(total_new_bugs))
+            else:
+                st.metric("累计新增BUG", 0)
+        
+        with col5:
             avg_release_orders = df['release_orders'].mean()
             st.metric("平均发布工单", f"{avg_release_orders:.1f}")
         
@@ -581,6 +618,18 @@ elif selected == "数据管理":
                             value=int(selected_record['fixed_bugs']),
                             help="本周解决的BUG数量"
                         )
+                        
+                        # 处理可能不存在的new_bugs字段
+                        new_bugs_value = 0
+                        if 'new_bugs' in selected_record:
+                            new_bugs_value = int(selected_record['new_bugs'])
+                            
+                        edit_new_bugs = st.number_input(
+                            "新增的BUG数",
+                            min_value=0,
+                            value=new_bugs_value,
+                            help="本周新增的BUG数量"
+                        )
                     
                     with col2:
                         st.subheader("🚀 发布相关")
@@ -628,6 +677,7 @@ elif selected == "数据管理":
                             'online_requirements': edit_online_requirements,
                             'online_req_count': edit_online_req_count,
                             'fixed_bugs': edit_fixed_bugs,
+                            'new_bugs': edit_new_bugs,
                             'bug_fix_rate': 95.0,  # 默认值，保持数据库兼容性
                             'release_orders': edit_release_orders,
                             'release_failures': edit_release_failures,

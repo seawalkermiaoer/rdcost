@@ -36,6 +36,7 @@ class WeeklyReportDB:
                 online_requirements INTEGER DEFAULT 0,
                 online_req_count INTEGER DEFAULT 0,
                 fixed_bugs INTEGER DEFAULT 0,
+                new_bugs INTEGER DEFAULT 0,
                 bug_fix_rate REAL DEFAULT 0.0,
                 release_orders INTEGER DEFAULT 0,
                 release_failures INTEGER DEFAULT 0,
@@ -46,8 +47,25 @@ class WeeklyReportDB:
             )
         """)
         
+        # 检查并添加new_bugs字段（用于数据库迁移）
+        self._migrate_add_new_bugs_column(cursor)
+        
         conn.commit()
         conn.close()
+    
+    def _migrate_add_new_bugs_column(self, cursor):
+        """迁移：添加new_bugs字段到现有表"""
+        try:
+            # 检查new_bugs字段是否存在
+            cursor.execute("PRAGMA table_info(weekly_reports)")
+            columns = [column[1] for column in cursor.fetchall()]
+            
+            if 'new_bugs' not in columns:
+                # 添加new_bugs字段
+                cursor.execute("ALTER TABLE weekly_reports ADD COLUMN new_bugs INTEGER DEFAULT 0")
+                print("数据库迁移：已添加new_bugs字段")
+        except Exception as e:
+            print(f"数据库迁移警告：{e}")
     
     def insert_weekly_report(self, data: Dict) -> int:
         """插入周报数据
@@ -75,15 +93,16 @@ class WeeklyReportDB:
         cursor.execute("""
             INSERT INTO weekly_reports (
                 monday_date, sunday_date, online_requirements, online_req_count,
-                fixed_bugs, bug_fix_rate, release_orders, release_failures,
+                fixed_bugs, new_bugs, bug_fix_rate, release_orders, release_failures,
                 new_reuse_units, new_reuse_events
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             data['monday_date'],
             data['sunday_date'],
             data['online_requirements'],
             data['online_req_count'],
             data['fixed_bugs'],
+            data['new_bugs'],
             data['bug_fix_rate'],
             data['release_orders'],
             data['release_failures'],
@@ -167,10 +186,18 @@ class WeeklyReportDB:
         # 因为这是更新已存在的记录，允许保持相同的时间范围
         cursor.execute("""
             UPDATE weekly_reports SET
-                monday_date = ?, sunday_date = ?, online_requirements = ?,
-                online_req_count = ?, fixed_bugs = ?, bug_fix_rate = ?,
-                release_orders = ?, release_failures = ?, new_reuse_units = ?,
-                new_reuse_events = ?, updated_at = CURRENT_TIMESTAMP
+                monday_date = ?,
+                sunday_date = ?,
+                online_requirements = ?,
+                online_req_count = ?,
+                fixed_bugs = ?,
+                new_bugs = ?,
+                bug_fix_rate = ?,
+                release_orders = ?,
+                release_failures = ?,
+                new_reuse_units = ?,
+                new_reuse_events = ?,
+                updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         """, (
             data['monday_date'],
@@ -178,6 +205,7 @@ class WeeklyReportDB:
             data['online_requirements'],
             data['online_req_count'],
             data['fixed_bugs'],
+            data['new_bugs'],
             data['bug_fix_rate'],
             data['release_orders'],
             data['release_failures'],
